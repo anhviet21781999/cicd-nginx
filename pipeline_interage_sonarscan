@@ -1,0 +1,58 @@
+pipeline {
+    agent any
+
+    environment {
+        GIT_REPO = 'https://github.com/anhviet21781999/cicd-nginx.git'
+        NGINX_SERVER = '192.168.0.6'
+        NGINX_USERNAME = 'root'
+        NGINX_SSH_CREDENTIALS = 'nginx-cicd1'
+        SONARQUBE_SERVER_URL = 'http://192.168.0.2:9000'
+        SONARQUBE_LOGIN = credentials('sonar') // Use the credential named 'sonar' to authenticate with SonarQube
+    }
+
+    stages {
+        stage('Fetch Code') {
+            steps {
+                git branch: 'main', url: env.GIT_REPO
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                // Run Maven tests
+                sh 'mvn clean test'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv(installationName: 'sonar') {
+                    sh '''
+                    export MAVEN_OPTS="--add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.lang.reflect=ALL-UNNAMED"
+                    mvn sonar:sonar -Dsonar.host.url=${SONARQUBE_SERVER_URL} -Dsonar.login=${SONARQUBE_LOGIN}
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Nginx Server') {
+            steps {
+                script {
+                    sshagent(['nginx-cicd1']) {
+                        sh "scp -r ./* ${NGINX_USERNAME}@${NGINX_SERVER}:/var/www/vietanh/html"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline finished successfully!'
+        }
+        failure {
+            echo 'Pipeline failed :('
+        }
+    }
+}
+

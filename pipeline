@@ -1,0 +1,51 @@
+pipeline {
+    agent any
+
+    environment {
+        GIT_REPO = 'https://github.com/anhviet21781999/cicd-nginx.git'
+        NGINX_SERVER = '192.168.0.6'
+        NGINX_USERNAME = 'root'
+        NGINX_SSH_CREDENTIALS = 'nginx-cicd1'
+    }
+
+    stages {
+        stage('Fetch Code') {
+            steps {
+                script {
+                    try {
+                        git branch: 'main', url: env.GIT_REPO
+                    } catch (Exception e) {
+                        error("Failed to fetch code from repository: ${e.message}")
+                    }
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                sh 'mvn clean test' // Example for Node.js projects
+                    // Example for Node.js projects
+            }
+        }
+
+        stage('Deploy to Nginx Server') {
+            steps {
+                script {
+                    sshagent(['nginx-cicd1']) {
+                        // Copy modified files to Nginx server
+                        sh "scp -r ./* ${env.NGINX_USERNAME}@${env.NGINX_SERVER}:/var/www/vietanh/html"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline finished successfully!'
+        }
+        failure {
+            echo 'Pipeline failed :('
+        }
+    }
+}
